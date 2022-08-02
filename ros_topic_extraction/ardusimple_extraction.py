@@ -1,6 +1,6 @@
 import rclpy
 import csv
-import datetime
+from datetime import datetime, timezone, timedelta
 
 from rclpy.node import Node
 from sensor_msgs.msg import NavSatFix
@@ -8,15 +8,16 @@ from sensor_msgs.msg import NavSatFix
 class MinimalSubscriber(Node):
 
     writer = None 
+    first_message = False
 
     def __init__(self):
-        super().__init__('minimal_subscriber')
+        super().__init__('ardusimple_extraction')
 
         # Initialize CSV Writer and Header
-        date = datetime.datetime.now()
+        date = datetime.now()
         filename = "ardusimple_" + str(date.day) + "-" + str(date.month) + "-" + str(date.year) + "-" + str(date.hour) + "-" + str(date.minute) + ".csv"
         self.writer = csv.writer(open(filename, "w"), delimiter=";")
-        csv_header = ['timestamp sec', 'timestamp nanosec', 'latitude', 'longitude', 'status']
+        csv_header = ['timestamp sec', 'timestamp nanosec', 'timestamp readable', 'latitude', 'longitude', 'status']
         self.writer.writerow(csv_header)
 
         # Subscribe to topic
@@ -28,8 +29,15 @@ class MinimalSubscriber(Node):
         self.subscription  # prevent unused variable warning
 
     def listener_callback(self, msg):
+        if self.first_message == False:
+            self.get_logger().info('first message received - please close this node with CTRL+C when the ROSBAG is finished playing.')
+            self.first_message = True
+
         #self.get_logger().info('lat: "%s"' % msg.latitude)
-        csv_data = [msg.header.stamp.sec, msg.header.stamp.nanosec, msg.latitude, msg.longitude, msg.status.status]
+        dt = datetime.fromtimestamp(msg.header.stamp.sec, tz=timezone.utc )
+        ms = (msg.header.stamp.nanosec / 1000)
+        dt_ms = timedelta(microseconds= ms)
+        csv_data = [msg.header.stamp.sec, msg.header.stamp.nanosec, dt + dt_ms, msg.latitude, msg.longitude, msg.status.status]
         self.writer.writerow(csv_data)
 
 
